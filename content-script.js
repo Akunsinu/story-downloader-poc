@@ -167,9 +167,18 @@
 
     if (window.__capturedStories[storyId]) return;
 
+    // Get profile picture URL
+    var profilePicUrl = null;
+    if (item.user && item.user.profile_pic_url) {
+      profilePicUrl = item.user.profile_pic_url;
+    } else if (user && user.profile_pic_url) {
+      profilePicUrl = user.profile_pic_url;
+    }
+
     var storyData = {
       id: String(storyId),
       username: username,
+      profilePicUrl: profilePicUrl,
       takenAt: item.taken_at,
       expiringAt: item.expiring_at,
       mediaType: item.media_type || 1,
@@ -272,11 +281,37 @@
         return;
       }
 
-      var container = findStoryContainer();
-      var uiElements = captureUIElements(container);
-      uiElements.username = uiElements.username || story.username;
+      console.log('[Story POC] Starting recording for:', story.username);
 
-      // Create our own video element and load the raw video
+      // Load profile picture first
+      var profilePicImage = null;
+      var profilePicLoaded = new Promise(function(picResolve) {
+        if (story.profilePicUrl) {
+          var img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = function() {
+            profilePicImage = img;
+            console.log('[Story POC] Profile pic loaded');
+            picResolve();
+          };
+          img.onerror = function() {
+            console.log('[Story POC] Profile pic failed to load');
+            picResolve();
+          };
+          img.src = story.profilePicUrl;
+        } else {
+          picResolve();
+        }
+      });
+
+      // Create UI elements from story data
+      var uiElements = {
+        username: story.username,
+        timestamp: formatTimestamp(story.takenAt),
+        profilePicImage: null
+      };
+
+      // Create video element and load raw video
       var video = document.createElement('video');
       video.crossOrigin = 'anonymous';
       video.muted = true;
@@ -294,97 +329,115 @@
       video.onloadedmetadata = function() {
         console.log('[Story POC] Video loaded:', video.videoWidth, 'x', video.videoHeight);
 
-        // Set up MediaRecorder
-        var stream = canvas.captureStream(30);
+        // Wait for profile pic to load before starting recording
+        profilePicLoaded.then(function() {
+          uiElements.profilePicImage = profilePicImage;
 
-        // Try different codecs
-        var mimeType = 'video/webm;codecs=vp9';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'video/webm;codecs=vp8';
-        }
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'video/webm';
-        }
+          // Set up MediaRecorder with H.264 for MP4 compatibility
+          var stream = canvas.captureStream(30);
 
-        recorder = new MediaRecorder(stream, {
-          mimeType: mimeType,
-          videoBitsPerSecond: 5000000
-        });
+          // Try MP4 first (H.264), then fall back to WebM
+          var mimeType = 'video/mp4;codecs=avc1';
+          var outputType = 'video/mp4';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm;codecs=h264';
+            outputType = 'video/webm';
+          }
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm;codecs=vp9';
+            outputType = 'video/webm';
+          }
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm;codecs=vp8';
+            outputType = 'video/webm';
+          }
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm';
+            outputType = 'video/webm';
+          }
 
-        recorder.ondataavailable = function(e) {
-          if (e.data.size > 0) chunks.push(e.data);
-        };
+          console.log('[Story POC] Using codec:', mimeType);
 
-        recorder.onstop = function() {
-          var blob = new Blob(chunks, { type: 'video/webm' });
-          console.log('[Story POC] Recording complete, size:', blob.size);
-          video.pause();
-          video.src = '';
-          resolve(blob);
-        };
+          recorder = new MediaRecorder(stream, {
+            mimeType: mimeType,
+            videoBitsPerSecond: 8000000
+          });
 
-        // Start recording and playing
-        recorder.start(100);
-        video.play();
+          recorder.ondataavailable = function(e) {
+            if (e.data.size > 0) chunks.push(e.data);
+          };
 
-        var duration = story.videoDuration || video.duration || 15;
-        var startTime = Date.now();
-        var maxDuration = duration * 1000;
+          recorder.onstop = function() {
+            var blob = new Blob(chunks, { type: outputType });
+            console.log('[Story POC] Recording complete, size:', blob.size, 'type:', outputType);
+            video.pause();
+            video.src = '';
+            resolve({ blob: blob, isMP4: outputType === 'video/mp4' });
+          };
 
-        function drawFrame() {
-          var elapsed = Date.now() - startTime;
-          var progress = Math.min(elapsed / maxDuration, 1);
+          // Start recording and playing
+          recorder.start(100);
+          video.play();
 
-          if (video.ended || elapsed >= maxDuration) {
+          var duration = story.videoDuration || video.duration || 15;
+          var startTime = Date.now();
+          var maxDuration = duration * 1000;
+
+          function drawFrame() {
+            var elapsed = Date.now() - startTime;
+            var progress = Math.min(elapsed / maxDuration, 1);
+
+            if (video.ended || elapsed >= maxDuration) {
+              if (recorder && recorder.state === 'recording') {
+                recorder.stop();
+              }
+              return;
+            }
+
+            // Clear and draw black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw video frame
+            if (video.readyState >= 2) {
+              var videoAspect = video.videoWidth / video.videoHeight;
+              var canvasAspect = canvas.width / canvas.height;
+              var drawWidth, drawHeight, drawX, drawY;
+
+              if (videoAspect > canvasAspect) {
+                drawWidth = canvas.width;
+                drawHeight = canvas.width / videoAspect;
+                drawX = 0;
+                drawY = (canvas.height - drawHeight) / 2;
+              } else {
+                drawHeight = canvas.height;
+                drawWidth = canvas.height * videoAspect;
+                drawX = (canvas.width - drawWidth) / 2;
+                drawY = 0;
+              }
+
+              try {
+                ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+              } catch (e) {
+                console.error('[Story POC] Draw error:', e);
+              }
+            }
+
+            // Draw UI overlay with progress
+            drawUIOverlay(ctx, canvas.width, canvas.height, uiElements, progress);
+
+            requestAnimationFrame(drawFrame);
+          }
+
+          drawFrame();
+
+          // Safety timeout
+          setTimeout(function() {
             if (recorder && recorder.state === 'recording') {
               recorder.stop();
             }
-            return;
-          }
-
-          // Clear and draw black background
-          ctx.fillStyle = '#000000';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          // Draw video frame
-          if (video.readyState >= 2) {
-            var videoAspect = video.videoWidth / video.videoHeight;
-            var canvasAspect = canvas.width / canvas.height;
-            var drawWidth, drawHeight, drawX, drawY;
-
-            if (videoAspect > canvasAspect) {
-              drawWidth = canvas.width;
-              drawHeight = canvas.width / videoAspect;
-              drawX = 0;
-              drawY = (canvas.height - drawHeight) / 2;
-            } else {
-              drawHeight = canvas.height;
-              drawWidth = canvas.height * videoAspect;
-              drawX = (canvas.width - drawWidth) / 2;
-              drawY = 0;
-            }
-
-            try {
-              ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
-            } catch (e) {
-              console.error('[Story POC] Draw error:', e);
-            }
-          }
-
-          // Draw UI overlay with progress
-          drawUIOverlay(ctx, canvas.width, canvas.height, uiElements, progress);
-
-          requestAnimationFrame(drawFrame);
-        }
-
-        drawFrame();
-
-        // Safety timeout
-        setTimeout(function() {
-          if (recorder && recorder.state === 'recording') {
-            recorder.stop();
-          }
-        }, maxDuration + 3000);
+          }, maxDuration + 3000);
+        });
       };
 
       video.onerror = function(e) {
@@ -397,6 +450,16 @@
       video.src = story.videoUrl;
       video.load();
     });
+  }
+
+  function formatTimestamp(takenAt) {
+    if (!takenAt) return '';
+    var now = Math.floor(Date.now() / 1000);
+    var diff = now - takenAt;
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h';
+    return Math.floor(diff / 86400) + 'd';
   }
 
   function captureUIElements(container) {
@@ -434,68 +497,135 @@
   function drawUIOverlay(ctx, width, height, ui, progress) {
     if (progress === undefined) progress = 0.5;
 
-    // Semi-transparent gradient at top
-    var gradient = ctx.createLinearGradient(0, 0, 0, 200);
-    gradient.addColorStop(0, 'rgba(0,0,0,0.6)');
+    // Scale factor for UI elements (1080x1920 canvas)
+    var scale = width / 1080;
+    var avatarSize = 80 * scale;
+    var avatarX = 40 * scale;
+    var avatarY = 70 * scale;
+    var textX = avatarX + avatarSize + 24 * scale;
+    var headerY = 50 * scale;
+
+    // Semi-transparent gradient at top (larger)
+    var gradient = ctx.createLinearGradient(0, 0, 0, 350 * scale);
+    gradient.addColorStop(0, 'rgba(0,0,0,0.7)');
     gradient.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, 200);
+    ctx.fillRect(0, 0, width, 350 * scale);
 
-    // Progress bar at top (animated)
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.fillRect(20, 20, width - 40, 4);
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillRect(20, 20, (width - 40) * progress, 4);
-
-    // Profile circle placeholder
+    // Progress bar at top (thicker)
+    var barY = 24 * scale;
+    var barHeight = 6 * scale;
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.beginPath();
-    ctx.arc(52, 80, 24, 0, Math.PI * 2);
+    ctx.roundRect(24 * scale, barY, width - 48 * scale, barHeight, barHeight / 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.beginPath();
+    ctx.roundRect(24 * scale, barY, (width - 48 * scale) * progress, barHeight, barHeight / 2);
     ctx.fill();
 
-    // Username text
+    // Profile picture (circular)
+    var avatarCenterX = avatarX + avatarSize / 2;
+    var avatarCenterY = avatarY + avatarSize / 2;
+
+    // Draw gradient ring around avatar (Instagram story style)
+    var ringGradient = ctx.createLinearGradient(
+      avatarCenterX - avatarSize / 2, avatarCenterY - avatarSize / 2,
+      avatarCenterX + avatarSize / 2, avatarCenterY + avatarSize / 2
+    );
+    ringGradient.addColorStop(0, '#F58529');
+    ringGradient.addColorStop(0.5, '#DD2A7B');
+    ringGradient.addColorStop(1, '#8134AF');
+    ctx.strokeStyle = ringGradient;
+    ctx.lineWidth = 4 * scale;
+    ctx.beginPath();
+    ctx.arc(avatarCenterX, avatarCenterY, avatarSize / 2 + 4 * scale, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Draw profile picture or placeholder
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarCenterX, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
+    ctx.clip();
+
+    if (ui.profilePicImage) {
+      // Draw the actual profile picture
+      ctx.drawImage(ui.profilePicImage, avatarX, avatarY, avatarSize, avatarSize);
+    } else {
+      // Placeholder circle
+      ctx.fillStyle = '#333333';
+      ctx.fillRect(avatarX, avatarY, avatarSize, avatarSize);
+      // Person icon placeholder
+      ctx.fillStyle = '#666666';
+      ctx.beginPath();
+      ctx.arc(avatarCenterX, avatarCenterY - 8 * scale, 16 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(avatarCenterX, avatarCenterY + 40 * scale, 28 * scale, Math.PI, 0);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Username text (larger, bold)
     if (ui.username) {
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 28px -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.fillText(ui.username, 90, 75);
+      ctx.font = 'bold ' + Math.round(42 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(ui.username, textX, avatarY + 35 * scale);
     }
 
-    // Timestamp
+    // Timestamp (larger)
     if (ui.timestamp) {
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.font = '22px -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.fillText(ui.timestamp, 90, 105);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = Math.round(32 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(ui.timestamp, textX, avatarY + 75 * scale);
     }
 
-    // Bottom gradient
-    var bottomGradient = ctx.createLinearGradient(0, height - 150, 0, height);
-    bottomGradient.addColorStop(0, 'rgba(0,0,0,0)');
-    bottomGradient.addColorStop(1, 'rgba(0,0,0,0.6)');
-    ctx.fillStyle = bottomGradient;
-    ctx.fillRect(0, height - 150, width, 150);
+    // Close button (X) on top right
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = Math.round(48 * scale) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('×', width - 60 * scale, 80 * scale);
 
-    // Reply bar placeholder
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    // More button (...)
+    ctx.font = 'bold ' + Math.round(40 * scale) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('···', width - 120 * scale, 76 * scale);
+
+    // Bottom gradient (larger)
+    var bottomGradient = ctx.createLinearGradient(0, height - 250 * scale, 0, height);
+    bottomGradient.addColorStop(0, 'rgba(0,0,0,0)');
+    bottomGradient.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = bottomGradient;
+    ctx.fillRect(0, height - 250 * scale, width, 250 * scale);
+
+    // Reply bar (larger)
+    var replyBarY = height - 100 * scale;
+    var replyBarHeight = 60 * scale;
+    var replyBarWidth = width - 200 * scale;
+
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
     ctx.beginPath();
-    ctx.roundRect(30, height - 70, width - 180, 44, 22);
+    ctx.roundRect(30 * scale, replyBarY, replyBarWidth, replyBarHeight, replyBarHeight / 2);
     ctx.fill();
 
     // Reply bar border
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 2 * scale;
     ctx.beginPath();
-    ctx.roundRect(30, height - 70, width - 180, 44, 22);
+    ctx.roundRect(30 * scale, replyBarY, replyBarWidth, replyBarHeight, replyBarHeight / 2);
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = '24px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.fillText('Send message', 55, height - 40);
+    // Reply bar text
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = Math.round(32 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('Send message', 60 * scale, replyBarY + 40 * scale);
 
-    // Heart and send icons on right
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.font = '28px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.fillText('♡', width - 120, height - 40);
-    ctx.fillText('➤', width - 60, height - 40);
+    // Heart icon on right (larger)
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.font = Math.round(48 * scale) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('♡', width - 140 * scale, replyBarY + 42 * scale);
+
+    // Send/share icon on right (larger)
+    ctx.font = Math.round(44 * scale) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('➤', width - 70 * scale, replyBarY + 42 * scale);
   }
 
   // ============================================================
@@ -748,11 +878,14 @@
     if (format === 'ui' || format === 'both') {
       if (story.mediaType === 2 && videoUIFormat === 'recording') {
         // Video recording - load raw video and composite UI on top
-        var recordFilename = generateFilename(story, 'ui', 'webm');
-        console.log('[Story POC] Recording with UI:', recordFilename);
+        console.log('[Story POC] Recording with UI...');
 
         promises.push(
-          recordStoryWithUI(story).then(function(blob) {
+          recordStoryWithUI(story).then(function(result) {
+            var blob = result.blob;
+            var ext = result.isMP4 ? 'mp4' : 'webm';
+            var recordFilename = generateFilename(story, 'ui', ext);
+            console.log('[Story POC] Recording done:', recordFilename, 'size:', blob.size);
             if (blob.size > 1000) {
               downloadBlob(blob, recordFilename);
             } else {
