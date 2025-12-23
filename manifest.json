@@ -34,7 +34,7 @@
   "web_accessible_resources": [
     {
       "matches": ["https://www.instagram.com/*"],
-      "resources": ["styles.css"]
+      "resources": ["styles.css", "html2canvas.min.js"]
     }
   ],
   "icons": {

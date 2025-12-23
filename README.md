@@ -8,6 +8,12 @@ A Chrome extension that downloads Instagram stories without marking them as view
 - Captures story data via XHR/fetch interception
 - Shows thumbnail grid of all captured stories
 - Downloads videos and images in highest quality
+- **Two download formats:**
+  - **Raw**: Original media file (video/image)
+  - **With UI**: Screenshot/recording with Instagram UI overlay visible
+- For videos with UI, choose between:
+  - Screenshot (single frame as PNG)
+  - Screen recording (WebM video)
 - Filenames include username, date, time, and story ID
 
 ## Installation
@@ -48,8 +54,12 @@ The extension intercepts Instagram's API responses to capture story media URLs b
 
 Downloads are saved as:
 ```
-{username}_story_{YYYYMMDD}_{HHMMSS}_{shortcode}_raw.{ext}
+{username}_story_{YYYYMMDD}_{HHMMSS}_{shortcode}_{type}.{ext}
 ```
+
+Where `{type}` is:
+- `raw` - Original media file
+- `ui` - Screenshot/recording with UI overlay
 
 ## Disclaimer
 
