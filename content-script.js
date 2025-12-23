@@ -566,28 +566,38 @@
     }
     ctx.restore();
 
-    // Username text (larger, bold)
+    // Enable text shadow for all text elements
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 8 * scale;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 2 * scale;
+
+    // Username text (larger, bold, white)
     if (ui.username) {
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold ' + Math.round(42 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.fillText(ui.username, textX, avatarY + 35 * scale);
     }
 
-    // Timestamp (larger)
+    // Timestamp (larger, bright white)
     if (ui.timestamp) {
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
       ctx.font = Math.round(32 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.fillText(ui.timestamp, textX, avatarY + 75 * scale);
     }
 
     // Close button (X) on top right
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = '#ffffff';
     ctx.font = Math.round(48 * scale) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.fillText('×', width - 60 * scale, 80 * scale);
 
     // More button (...)
     ctx.font = 'bold ' + Math.round(40 * scale) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.fillText('···', width - 120 * scale, 76 * scale);
+
+    // Disable shadow for shapes
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
 
     // Bottom gradient (larger)
     var bottomGradient = ctx.createLinearGradient(0, height - 250 * scale, 0, height);
@@ -601,31 +611,38 @@
     var replyBarHeight = 60 * scale;
     var replyBarWidth = width - 200 * scale;
 
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.beginPath();
     ctx.roundRect(30 * scale, replyBarY, replyBarWidth, replyBarHeight, replyBarHeight / 2);
     ctx.fill();
 
     // Reply bar border
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
     ctx.lineWidth = 2 * scale;
     ctx.beginPath();
     ctx.roundRect(30 * scale, replyBarY, replyBarWidth, replyBarHeight, replyBarHeight / 2);
     ctx.stroke();
 
-    // Reply bar text
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    // Reply bar text (with shadow for readability)
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 4 * scale;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.font = Math.round(32 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.fillText('Send message', 60 * scale, replyBarY + 40 * scale);
 
-    // Heart icon on right (larger)
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    // Heart icon on right (larger, white)
+    ctx.shadowBlur = 6 * scale;
+    ctx.fillStyle = '#ffffff';
     ctx.font = Math.round(48 * scale) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.fillText('♡', width - 140 * scale, replyBarY + 42 * scale);
 
-    // Send/share icon on right (larger)
+    // Send/share icon on right (larger, white)
     ctx.font = Math.round(44 * scale) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.fillText('➤', width - 70 * scale, replyBarY + 42 * scale);
+
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
   }
 
   // ============================================================
