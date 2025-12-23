@@ -1,4 +1,4 @@
-# Story Downloader POC
+# IG-Story-Quicksave
 
 A Chrome extension that downloads Instagram stories without marking them as viewed.
 

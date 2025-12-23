@@ -1,6 +1,6 @@
 /**
- * Story Downloader POC - With UI Capture Support
- * Downloads stories as raw files or with Instagram UI overlay
+ * IG-Story-Quicksave v1.1
+ * Downloads Instagram stories as raw files or with UI overlay
  */
 
 (function() {
@@ -942,7 +942,7 @@
       'align-items:center;margin-bottom:15px;color:white;flex-wrap:wrap;gap:10px;';
 
     var title = document.createElement('div');
-    title.innerHTML = '<span style="font-size:18px;font-weight:bold;">Story Downloader POC</span>' +
+    title.innerHTML = '<span style="font-size:18px;font-weight:bold;">IG-Story-Quicksave</span>' +
       '<span style="font-size:14px;opacity:0.7;margin-left:10px;">' + stories.length + ' stories</span>';
 
     var headerButtons = document.createElement('div');
