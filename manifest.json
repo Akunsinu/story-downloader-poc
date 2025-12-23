@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Story Downloader POC",
+  "description": "Download Instagram stories without viewing them - Proof of Concept",
+  "version": "1.0.0",
+  "permissions": [
+    "scripting",
+    "storage",
+    "downloads",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "https://www.instagram.com/*",
+    "https://*.cdninstagram.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "js": ["content-script.js"],
+      "css": ["styles.css"],
+      "matches": ["https://www.instagram.com/*"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "js": ["bridge.js"],
+      "matches": ["https://www.instagram.com/*"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "matches": ["https://www.instagram.com/*"],
+      "resources": ["styles.css"]
+    }
+  ],
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}

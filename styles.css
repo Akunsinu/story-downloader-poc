@@ -1,0 +1,21 @@
+/* Story Downloader POC - Styles */
+
+#story-poc-download-btn:hover {
+  transform: scale(1.1) !important;
+}
+
+#story-poc-modal img {
+  transition: transform 0.2s;
+}
+
+#story-poc-modal img:hover {
+  transform: scale(1.05);
+}
+
+#poc-download-all:hover {
+  background: #1aa3ff !important;
+}
+
+#poc-close-modal:hover {
+  background: #444 !important;
+}
