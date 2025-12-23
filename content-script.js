@@ -267,25 +267,31 @@
 
   function recordStoryWithUI(duration) {
     return new Promise(function(resolve, reject) {
-      var container = findStoryContainer();
-      if (!container) {
-        reject(new Error('Story container not found'));
+      // Find the video element
+      var video = document.querySelector('video');
+      if (!video) {
+        reject(new Error('Video element not found'));
         return;
       }
 
-      // Create a canvas to draw frames
+      var container = findStoryContainer();
+
+      // Create canvas for compositing
       var canvas = document.createElement('canvas');
       var ctx = canvas.getContext('2d');
 
-      // Get container dimensions
-      var rect = container.getBoundingClientRect();
-      canvas.width = rect.width * 2;
-      canvas.height = rect.height * 2;
+      // Set canvas size to match video
+      canvas.width = 1080;
+      canvas.height = 1920;
 
+      // Get UI elements to overlay
+      var uiElements = captureUIElements(container);
+
+      // Set up MediaRecorder
       var stream = canvas.captureStream(30);
       var recorder = new MediaRecorder(stream, {
         mimeType: 'video/webm;codecs=vp9',
-        videoBitsPerSecond: 5000000
+        videoBitsPerSecond: 8000000
       });
 
       var chunks = [];
@@ -299,40 +305,147 @@
       };
 
       // Start recording
-      recorder.start();
+      recorder.start(100); // Collect data every 100ms
 
-      // Capture frames using html2canvas
-      var frameCount = 0;
-      var maxFrames = Math.ceil(duration * 30);
-      var captureInterval = setInterval(function() {
-        if (frameCount >= maxFrames) {
-          clearInterval(captureInterval);
+      // Draw frames at 30fps
+      var startTime = Date.now();
+      var maxDuration = (duration || 15) * 1000;
+
+      function drawFrame() {
+        var elapsed = Date.now() - startTime;
+
+        if (elapsed >= maxDuration || video.ended || video.paused) {
           recorder.stop();
           return;
         }
 
-        window.html2canvas(container, {
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#000000',
-          scale: 2,
-          logging: false
-        }).then(function(frameCanvas) {
-          ctx.drawImage(frameCanvas, 0, 0, canvas.width, canvas.height);
-          frameCount++;
-        }).catch(function() {
-          frameCount++;
+        // Clear canvas
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw video frame centered
+        var videoAspect = video.videoWidth / video.videoHeight;
+        var canvasAspect = canvas.width / canvas.height;
+        var drawWidth, drawHeight, drawX, drawY;
+
+        if (videoAspect > canvasAspect) {
+          drawWidth = canvas.width;
+          drawHeight = canvas.width / videoAspect;
+          drawX = 0;
+          drawY = (canvas.height - drawHeight) / 2;
+        } else {
+          drawHeight = canvas.height;
+          drawWidth = canvas.height * videoAspect;
+          drawX = (canvas.width - drawWidth) / 2;
+          drawY = 0;
+        }
+
+        try {
+          ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+        } catch (e) {
+          // Video might not be ready
+        }
+
+        // Draw UI overlay
+        drawUIOverlay(ctx, canvas.width, canvas.height, uiElements);
+
+        requestAnimationFrame(drawFrame);
+      }
+
+      // Ensure video is playing
+      if (video.paused) {
+        video.play().then(drawFrame).catch(function() {
+          drawFrame();
         });
-      }, 33); // ~30fps
+      } else {
+        drawFrame();
+      }
 
       // Safety timeout
       setTimeout(function() {
-        clearInterval(captureInterval);
         if (recorder.state === 'recording') {
           recorder.stop();
         }
-      }, (duration + 2) * 1000);
+      }, maxDuration + 2000);
     });
+  }
+
+  function captureUIElements(container) {
+    var ui = {
+      username: '',
+      timestamp: '',
+      profilePic: null
+    };
+
+    if (!container) return ui;
+
+    // Try to find username
+    var usernameEl = container.querySelector('a[href*="/"] span') ||
+                     container.querySelector('header span');
+    if (usernameEl) {
+      ui.username = usernameEl.textContent || '';
+    }
+
+    // Try to find timestamp
+    var timeEl = container.querySelector('time') ||
+                 container.querySelector('header span:last-child');
+    if (timeEl) {
+      ui.timestamp = timeEl.textContent || '';
+    }
+
+    // Try to find profile picture
+    var profileImg = container.querySelector('header img');
+    if (profileImg && profileImg.src) {
+      ui.profilePic = profileImg.src;
+    }
+
+    return ui;
+  }
+
+  function drawUIOverlay(ctx, width, height, ui) {
+    // Semi-transparent gradient at top
+    var gradient = ctx.createLinearGradient(0, 0, 0, 200);
+    gradient.addColorStop(0, 'rgba(0,0,0,0.6)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, 200);
+
+    // Progress bar at top
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(20, 20, width - 40, 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillRect(20, 20, (width - 40) * 0.5, 4);
+
+    // Username text
+    if (ui.username) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 32px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillText(ui.username, 80, 80);
+    }
+
+    // Timestamp
+    if (ui.timestamp) {
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '24px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillText(ui.timestamp, 80, 115);
+    }
+
+    // Bottom gradient
+    var bottomGradient = ctx.createLinearGradient(0, height - 150, 0, height);
+    bottomGradient.addColorStop(0, 'rgba(0,0,0,0)');
+    bottomGradient.addColorStop(1, 'rgba(0,0,0,0.6)');
+    ctx.fillStyle = bottomGradient;
+    ctx.fillRect(0, height - 150, width, 150);
+
+    // Reply bar placeholder
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.beginPath();
+    ctx.roundRect(40, height - 80, width - 200, 50, 25);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '28px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('Reply...', 70, height - 47);
   }
 
   // ============================================================
