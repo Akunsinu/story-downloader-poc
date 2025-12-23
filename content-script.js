@@ -12,10 +12,6 @@
   // Storage for captured story data
   window.__capturedStories = {};
 
-  // Download format preference
-  window.__downloadFormat = 'both'; // 'raw', 'ui', 'both'
-  window.__videoUIFormat = 'screenshot'; // 'screenshot', 'recording'
-
   console.log('[Story POC] Initializing...');
 
   // ============================================================
@@ -240,37 +236,147 @@
     return null;
   }
 
-  function captureStoryWithUI() {
+  function captureScreenshotWithUI(story) {
     return new Promise(function(resolve, reject) {
-      if (!window.html2canvas) {
-        reject(new Error('html2canvas not loaded'));
+      var mediaUrl = story.videoUrl || story.imageUrl;
+      if (!mediaUrl) {
+        reject(new Error('No media URL'));
         return;
       }
 
-      var container = findStoryContainer();
-      if (!container) {
-        reject(new Error('Story container not found'));
-        return;
-      }
+      console.log('[Story POC] Capturing screenshot for:', story.username);
 
-      window.html2canvas(container, {
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#000000',
-        scale: 2,
-        logging: false,
-        onclone: function(clonedDoc) {
-          // Ensure videos show their poster/current frame
-          var videos = clonedDoc.querySelectorAll('video');
-          videos.forEach(function(v) {
-            v.style.display = 'block';
-          });
+      // Load profile picture
+      var profilePicImage = null;
+      var profilePicLoaded = new Promise(function(picResolve) {
+        if (story.profilePicUrl) {
+          var img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = function() {
+            profilePicImage = img;
+            picResolve();
+          };
+          img.onerror = function() {
+            picResolve();
+          };
+          img.src = story.profilePicUrl;
+        } else {
+          picResolve();
         }
-      }).then(function(canvas) {
-        canvas.toBlob(function(blob) {
-          resolve(blob);
-        }, 'image/png', 1.0);
-      }).catch(reject);
+      });
+
+      // Create UI elements
+      var uiElements = {
+        username: story.username,
+        timestamp: formatTimestamp(story.takenAt),
+        profilePicImage: null
+      };
+
+      // Create canvas
+      var canvas = document.createElement('canvas');
+      var ctx = canvas.getContext('2d');
+      canvas.width = 1080;
+      canvas.height = 1920;
+
+      if (story.videoUrl) {
+        // For video: load video and capture first frame
+        var video = document.createElement('video');
+        video.crossOrigin = 'anonymous';
+        video.muted = true;
+        video.playsInline = true;
+
+        video.onloadeddata = function() {
+          profilePicLoaded.then(function() {
+            uiElements.profilePicImage = profilePicImage;
+
+            // Draw black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw video frame
+            var videoAspect = video.videoWidth / video.videoHeight;
+            var canvasAspect = canvas.width / canvas.height;
+            var drawWidth, drawHeight, drawX, drawY;
+
+            if (videoAspect > canvasAspect) {
+              drawWidth = canvas.width;
+              drawHeight = canvas.width / videoAspect;
+              drawX = 0;
+              drawY = (canvas.height - drawHeight) / 2;
+            } else {
+              drawHeight = canvas.height;
+              drawWidth = canvas.height * videoAspect;
+              drawX = (canvas.width - drawWidth) / 2;
+              drawY = 0;
+            }
+
+            ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+
+            // Draw UI overlay
+            drawUIOverlay(ctx, canvas.width, canvas.height, uiElements, 0);
+
+            // Convert to blob
+            canvas.toBlob(function(blob) {
+              video.src = '';
+              resolve(blob);
+            }, 'image/png', 1.0);
+          });
+        };
+
+        video.onerror = function() {
+          reject(new Error('Failed to load video for screenshot'));
+        };
+
+        video.src = story.videoUrl;
+        video.load();
+      } else {
+        // For image: load image and draw
+        var img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        img.onload = function() {
+          profilePicLoaded.then(function() {
+            uiElements.profilePicImage = profilePicImage;
+
+            // Draw black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw image
+            var imgAspect = img.width / img.height;
+            var canvasAspect = canvas.width / canvas.height;
+            var drawWidth, drawHeight, drawX, drawY;
+
+            if (imgAspect > canvasAspect) {
+              drawWidth = canvas.width;
+              drawHeight = canvas.width / imgAspect;
+              drawX = 0;
+              drawY = (canvas.height - drawHeight) / 2;
+            } else {
+              drawHeight = canvas.height;
+              drawWidth = canvas.height * imgAspect;
+              drawX = (canvas.width - drawWidth) / 2;
+              drawY = 0;
+            }
+
+            ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+
+            // Draw UI overlay
+            drawUIOverlay(ctx, canvas.width, canvas.height, uiElements, 1);
+
+            // Convert to blob
+            canvas.toBlob(function(blob) {
+              resolve(blob);
+            }, 'image/png', 1.0);
+          });
+        };
+
+        img.onerror = function() {
+          reject(new Error('Failed to load image for screenshot'));
+        };
+
+        img.src = story.imageUrl;
+      }
     });
   }
 
@@ -850,33 +956,23 @@
     var labelStyle = 'display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 16px;' +
       'background:#f0f0f0;border-radius:8px;font-size:14px;font-weight:500;color:#000000;' +
       'border:2px solid transparent;transition:all 0.2s;';
-    var labelCheckedStyle = 'display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 16px;' +
-      'background:#e3f2fd;border-radius:8px;font-size:14px;font-weight:500;color:#1976d2;' +
-      'border:2px solid #1976d2;transition:all 0.2s;';
 
-    formatSection.innerHTML = '<div style="margin-bottom:12px;font-weight:bold;font-size:16px;color:#000000;">Download Format</div>' +
+    formatSection.innerHTML = '<div style="margin-bottom:12px;font-weight:bold;font-size:16px;color:#000000;">Download Formats (select one or more)</div>' +
       '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
-        '<label style="' + (window.__downloadFormat === 'raw' ? labelCheckedStyle : labelStyle) + '">' +
-          '<input type="radio" name="poc-format" value="raw" ' + (window.__downloadFormat === 'raw' ? 'checked' : '') + ' style="accent-color:#1976d2;width:18px;height:18px;"> Raw Only' +
+        '<label style="' + labelStyle + '" id="lbl-raw">' +
+          '<input type="checkbox" name="poc-format" value="raw" checked style="accent-color:#1976d2;width:18px;height:18px;"> Raw' +
         '</label>' +
-        '<label style="' + (window.__downloadFormat === 'ui' ? labelCheckedStyle : labelStyle) + '">' +
-          '<input type="radio" name="poc-format" value="ui" ' + (window.__downloadFormat === 'ui' ? 'checked' : '') + ' style="accent-color:#1976d2;width:18px;height:18px;"> With UI Only' +
+        '<label style="' + labelStyle + '" id="lbl-original">' +
+          '<input type="checkbox" name="poc-format" value="original" checked style="accent-color:#1976d2;width:18px;height:18px;"> Original (with UI)' +
         '</label>' +
-        '<label style="' + (window.__downloadFormat === 'both' ? labelCheckedStyle : labelStyle) + '">' +
-          '<input type="radio" name="poc-format" value="both" ' + (window.__downloadFormat === 'both' ? 'checked' : '') + ' style="accent-color:#1976d2;width:18px;height:18px;"> Both Versions' +
+        '<label style="' + labelStyle + '" id="lbl-screenshot">' +
+          '<input type="checkbox" name="poc-format" value="screenshot" style="accent-color:#1976d2;width:18px;height:18px;"> Screenshot (with UI)' +
         '</label>' +
       '</div>' +
-      '<div id="poc-video-options" style="margin-top:16px;padding-top:16px;border-top:2px solid #e0e0e0;' +
-        (window.__downloadFormat === 'raw' ? 'display:none;' : '') + '">' +
-        '<div style="margin-bottom:12px;font-weight:bold;font-size:16px;color:#000000;">Video UI Format</div>' +
-        '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
-          '<label style="' + (window.__videoUIFormat === 'screenshot' ? labelCheckedStyle : labelStyle) + '">' +
-            '<input type="radio" name="poc-video-format" value="screenshot" ' + (window.__videoUIFormat === 'screenshot' ? 'checked' : '') + ' style="accent-color:#1976d2;width:18px;height:18px;"> Screenshot (PNG)' +
-          '</label>' +
-          '<label style="' + (window.__videoUIFormat === 'recording' ? labelCheckedStyle : labelStyle) + '">' +
-            '<input type="radio" name="poc-video-format" value="recording" ' + (window.__videoUIFormat === 'recording' ? 'checked' : '') + ' style="accent-color:#1976d2;width:18px;height:18px;"> Screen Recording (MP4)' +
-          '</label>' +
-        '</div>' +
+      '<div style="margin-top:12px;font-size:13px;color:#666;">' +
+        '<b>Raw:</b> Original media file &nbsp;|&nbsp; ' +
+        '<b>Original:</b> Video recording / Image with UI overlay &nbsp;|&nbsp; ' +
+        '<b>Screenshot:</b> Single frame with UI (PNG)' +
       '</div>';
 
     // Grid
@@ -919,23 +1015,23 @@
     modal.appendChild(grid);
     document.body.appendChild(modal);
 
-    // Event listeners for format options
-    var formatRadios = modal.querySelectorAll('input[name="poc-format"]');
-    formatRadios.forEach(function(radio) {
-      radio.addEventListener('change', function() {
-        window.__downloadFormat = this.value;
-        var videoOptions = document.getElementById('poc-video-options');
-        if (videoOptions) {
-          videoOptions.style.display = this.value === 'raw' ? 'none' : 'block';
+    // Update checkbox label styles on change
+    var formatCheckboxes = modal.querySelectorAll('input[name="poc-format"]');
+    formatCheckboxes.forEach(function(checkbox) {
+      checkbox.addEventListener('change', function() {
+        var label = this.parentElement;
+        if (this.checked) {
+          label.style.background = '#e3f2fd';
+          label.style.color = '#1976d2';
+          label.style.border = '2px solid #1976d2';
+        } else {
+          label.style.background = '#f0f0f0';
+          label.style.color = '#000000';
+          label.style.border = '2px solid transparent';
         }
       });
-    });
-
-    var videoFormatRadios = modal.querySelectorAll('input[name="poc-video-format"]');
-    videoFormatRadios.forEach(function(radio) {
-      radio.addEventListener('change', function() {
-        window.__videoUIFormat = this.value;
-      });
+      // Trigger initial style
+      checkbox.dispatchEvent(new Event('change'));
     });
 
     closeBtn.onclick = function() { modal.remove(); };
@@ -947,11 +1043,6 @@
         document.removeEventListener('keydown', handleEscape);
       }
     });
-
-    // Load html2canvas if needed
-    if (window.__downloadFormat !== 'raw') {
-      loadHtml2Canvas();
-    }
   }
 
   // ============================================================
@@ -981,15 +1072,29 @@
     URL.revokeObjectURL(blobUrl);
   }
 
-  function downloadStory(story, index) {
-    var format = window.__downloadFormat;
-    var videoUIFormat = window.__videoUIFormat;
-    var promises = [];
+  function getSelectedFormats() {
+    var formats = [];
+    var checkboxes = document.querySelectorAll('input[name="poc-format"]:checked');
+    checkboxes.forEach(function(cb) {
+      formats.push(cb.value);
+    });
+    return formats;
+  }
 
-    // Download raw version
-    if (format === 'raw' || format === 'both') {
+  function downloadStory(story, index) {
+    var formats = getSelectedFormats();
+    var promises = [];
+    var isVideo = story.mediaType === 2;
+
+    if (formats.length === 0) {
+      alert('Please select at least one download format');
+      return Promise.resolve();
+    }
+
+    // Download RAW version
+    if (formats.indexOf('raw') !== -1) {
       var rawUrl = story.videoUrl || story.imageUrl;
-      var rawExt = story.mediaType === 2 ? 'mp4' : 'jpg';
+      var rawExt = isVideo ? 'mp4' : 'jpg';
       var rawFilename = generateFilename(story, 'raw', rawExt);
 
       console.log('[Story POC] Downloading raw:', rawFilename);
@@ -1004,11 +1109,11 @@
       }));
     }
 
-    // Download UI version
-    if (format === 'ui' || format === 'both') {
-      if (story.mediaType === 2 && videoUIFormat === 'recording') {
-        // Video recording - load raw video and composite UI on top
-        console.log('[Story POC] Recording with UI...');
+    // Download ORIGINAL version (video recording with UI, or image with UI)
+    if (formats.indexOf('original') !== -1) {
+      if (isVideo) {
+        // Video: record with UI overlay
+        console.log('[Story POC] Recording video with UI...');
 
         promises.push(
           recordStoryWithUI(story).then(function(result) {
@@ -1026,20 +1131,32 @@
           })
         );
       } else {
-        // Screenshot (for images or video frame)
-        var uiFilename = generateFilename(story, 'original', 'png');
-        console.log('[Story POC] Capturing with UI:', uiFilename);
+        // Image: capture with UI overlay
+        var originalFilename = generateFilename(story, 'original', 'png');
+        console.log('[Story POC] Capturing image with UI:', originalFilename);
 
         promises.push(
-          loadHtml2Canvas().then(function() {
-            return captureStoryWithUI();
-          }).then(function(blob) {
-            downloadBlob(blob, uiFilename);
+          captureScreenshotWithUI(story).then(function(blob) {
+            downloadBlob(blob, originalFilename);
           }).catch(function(err) {
-            console.error('[Story POC] UI capture failed:', err);
+            console.error('[Story POC] Image capture failed:', err);
           })
         );
       }
+    }
+
+    // Download SCREENSHOT version (single frame with UI - for both video and image)
+    if (formats.indexOf('screenshot') !== -1) {
+      var screenshotFilename = generateFilename(story, 'screenshot', 'png');
+      console.log('[Story POC] Capturing screenshot with UI:', screenshotFilename);
+
+      promises.push(
+        captureScreenshotWithUI(story).then(function(blob) {
+          downloadBlob(blob, screenshotFilename);
+        }).catch(function(err) {
+          console.error('[Story POC] Screenshot capture failed:', err);
+        })
+      );
     }
 
     return Promise.all(promises);
