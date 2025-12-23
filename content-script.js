@@ -754,124 +754,122 @@
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
 
-    // === BOTTOM BLACK BAR (Instagram style) ===
-    var bottomBarHeight = 110 * scale;
-    var storyBottomY = height - bottomBarHeight;
+    // Bottom gradient (larger)
+    var bottomGradient = ctx.createLinearGradient(0, height - 250 * scale, 0, height);
+    bottomGradient.addColorStop(0, 'rgba(0,0,0,0)');
+    bottomGradient.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = bottomGradient;
+    ctx.fillRect(0, height - 250 * scale, width, 250 * scale);
 
-    // Solid black bar at bottom
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, storyBottomY, width, bottomBarHeight);
+    // Reply bar (larger)
+    var replyBarY = height - 100 * scale;
+    var replyBarHeight = 60 * scale;
+    var replyBarWidth = width - 260 * scale;
 
-    // === SEND MESSAGE INPUT ===
-    var inputHeight = 44 * scale;
-    var inputY = storyBottomY + (bottomBarHeight - inputHeight) / 2;
-    var inputX = 28 * scale;
-    var inputWidth = width - 220 * scale;
-
-    // Dark grey pill-shaped input
-    ctx.fillStyle = '#262626';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.beginPath();
-    ctx.roundRect(inputX, inputY, inputWidth, inputHeight, inputHeight / 2);
+    ctx.roundRect(30 * scale, replyBarY, replyBarWidth, replyBarHeight, replyBarHeight / 2);
     ctx.fill();
 
-    // Subtle border
-    ctx.strokeStyle = '#363636';
-    ctx.lineWidth = 1 * scale;
+    // Reply bar border
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 2 * scale;
     ctx.beginPath();
-    ctx.roundRect(inputX, inputY, inputWidth, inputHeight, inputHeight / 2);
+    ctx.roundRect(30 * scale, replyBarY, replyBarWidth, replyBarHeight, replyBarHeight / 2);
     ctx.stroke();
 
-    // "Send message..." text
-    ctx.fillStyle = '#a0a0a0';
-    ctx.font = '400 ' + Math.round(26 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText('Send message...', inputX + 20 * scale, inputY + inputHeight / 2 + 8 * scale);
+    // Reply bar text (with shadow for readability)
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 4 * scale;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = Math.round(32 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('Send message...', 60 * scale, replyBarY + 40 * scale);
 
-    // === BOTTOM ICONS ===
-    var iconY = storyBottomY + bottomBarHeight / 2;
-    var iconSpacing = 56 * scale;
-    var firstIconX = width - 170 * scale;
+    // Reset shadow for icons
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
 
-    ctx.strokeStyle = '#ffffff';
+    // Icons on right side
+    var iconY = replyBarY + replyBarHeight / 2;
     ctx.fillStyle = '#ffffff';
-    ctx.lineWidth = 2 * scale;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.5 * scale;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Heart icon
-    drawHeartIcon(ctx, firstIconX, iconY, 26 * scale);
+    // Heart icon (outline) - ♡
+    var heartX = width - 200 * scale;
+    drawHeartIcon(ctx, heartX, iconY, 28 * scale);
 
-    // Comment bubble icon
-    drawCommentIcon(ctx, firstIconX + iconSpacing, iconY, 26 * scale);
+    // Comment/speech bubble icon
+    var commentX = width - 130 * scale;
+    drawCommentIcon(ctx, commentX, iconY, 28 * scale);
 
     // Paper plane / Send icon
-    drawSendIcon(ctx, firstIconX + iconSpacing * 2, iconY, 26 * scale);
+    var sendX = width - 55 * scale;
+    drawSendIcon(ctx, sendX, iconY, 28 * scale);
   }
 
-  // Draw heart outline icon (Instagram style)
+  // Draw heart outline icon
   function drawHeartIcon(ctx, x, y, size) {
     ctx.save();
     ctx.translate(x, y);
-    var s = size / 24;
+    var s = size / 28;
     ctx.scale(s, s);
-    ctx.lineWidth = 2;
     ctx.beginPath();
-    // Heart shape
-    ctx.moveTo(0, 6);
-    ctx.bezierCurveTo(-1, 5, -3, 2, -6, 2);
-    ctx.bezierCurveTo(-10, 2, -12, 6, -12, 9);
-    ctx.bezierCurveTo(-12, 14, -6, 18, 0, 22);
-    ctx.bezierCurveTo(6, 18, 12, 14, 12, 9);
-    ctx.bezierCurveTo(12, 6, 10, 2, 6, 2);
-    ctx.bezierCurveTo(3, 2, 1, 5, 0, 6);
+    ctx.moveTo(0, -8);
+    ctx.bezierCurveTo(-10, -18, -22, -6, -14, 8);
+    ctx.lineTo(0, 20);
+    ctx.lineTo(14, 8);
+    ctx.bezierCurveTo(22, -6, 10, -18, 0, -8);
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
   }
 
-  // Draw comment/speech bubble icon (Instagram style)
+  // Draw comment/speech bubble icon
   function drawCommentIcon(ctx, x, y, size) {
     ctx.save();
     ctx.translate(x, y);
-    var s = size / 24;
+    var s = size / 28;
     ctx.scale(s, s);
-    ctx.lineWidth = 2;
     ctx.beginPath();
-    // Rounded bubble with tail at bottom-left
-    ctx.moveTo(-9, -10);
-    ctx.quadraticCurveTo(-12, -10, -12, -6);
-    ctx.lineTo(-12, 4);
-    ctx.quadraticCurveTo(-12, 8, -8, 8);
-    ctx.lineTo(-6, 8);
-    ctx.lineTo(-10, 14);
-    ctx.lineTo(-2, 8);
-    ctx.lineTo(9, 8);
-    ctx.quadraticCurveTo(12, 8, 12, 4);
-    ctx.lineTo(12, -6);
-    ctx.quadraticCurveTo(12, -10, 9, -10);
+    // Rounded rectangle bubble
+    ctx.moveTo(-12, -14);
+    ctx.lineTo(12, -14);
+    ctx.quadraticCurveTo(18, -14, 18, -8);
+    ctx.lineTo(18, 4);
+    ctx.quadraticCurveTo(18, 10, 12, 10);
+    ctx.lineTo(-2, 10);
+    ctx.lineTo(-10, 20);
+    ctx.lineTo(-8, 10);
+    ctx.lineTo(-12, 10);
+    ctx.quadraticCurveTo(-18, 10, -18, 4);
+    ctx.lineTo(-18, -8);
+    ctx.quadraticCurveTo(-18, -14, -12, -14);
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
   }
 
-  // Draw paper plane / send icon (Instagram DM style)
+  // Draw paper plane / send icon
   function drawSendIcon(ctx, x, y, size) {
     ctx.save();
     ctx.translate(x, y);
-    var s = size / 24;
+    var s = size / 28;
     ctx.scale(s, s);
-    ctx.lineWidth = 2;
     ctx.beginPath();
-    // Paper plane outline
-    ctx.moveTo(-10, 10);
-    ctx.lineTo(12, 0);
-    ctx.lineTo(-10, -10);
-    ctx.lineTo(-4, 0);
+    // Paper plane pointing right (Instagram DM style)
+    ctx.moveTo(-14, 16);
+    ctx.lineTo(18, 0);
+    ctx.lineTo(-14, -16);
+    ctx.lineTo(-8, 0);
     ctx.closePath();
     ctx.stroke();
-    // Diagonal line inside
+    // Inner line
     ctx.beginPath();
-    ctx.moveTo(-4, 0);
-    ctx.lineTo(12, 0);
+    ctx.moveTo(-8, 0);
+    ctx.lineTo(18, 0);
     ctx.stroke();
     ctx.restore();
   }
