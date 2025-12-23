@@ -314,8 +314,9 @@
       // Create video element and load raw video
       var video = document.createElement('video');
       video.crossOrigin = 'anonymous';
-      video.muted = true;
+      video.muted = false; // Keep audio enabled
       video.playsInline = true;
+      video.volume = 1.0;
 
       // Create canvas for compositing
       var canvas = document.createElement('canvas');
@@ -325,6 +326,7 @@
 
       var recorder = null;
       var chunks = [];
+      var audioContext = null;
 
       video.onloadedmetadata = function() {
         console.log('[Story POC] Video loaded:', video.videoWidth, 'x', video.videoHeight);
@@ -333,8 +335,33 @@
         profilePicLoaded.then(function() {
           uiElements.profilePicImage = profilePicImage;
 
-          // Set up MediaRecorder with H.264 for MP4 compatibility
-          var stream = canvas.captureStream(30);
+          // Set up video stream from canvas
+          var videoStream = canvas.captureStream(30);
+
+          // Set up audio capture from video element
+          var combinedStream = new MediaStream();
+
+          // Add video tracks
+          videoStream.getVideoTracks().forEach(function(track) {
+            combinedStream.addTrack(track);
+          });
+
+          // Capture audio from video element
+          try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            var source = audioContext.createMediaElementSource(video);
+            var destination = audioContext.createMediaStreamDestination();
+            source.connect(destination);
+            source.connect(audioContext.destination); // Also play through speakers
+
+            // Add audio tracks to combined stream
+            destination.stream.getAudioTracks().forEach(function(track) {
+              combinedStream.addTrack(track);
+              console.log('[Story POC] Audio track added');
+            });
+          } catch (e) {
+            console.log('[Story POC] Could not capture audio:', e.message);
+          }
 
           // Try MP4 first (H.264), then fall back to WebM
           var mimeType = 'video/mp4;codecs=avc1';
@@ -344,11 +371,11 @@
             outputType = 'video/webm';
           }
           if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'video/webm;codecs=vp9';
+            mimeType = 'video/webm;codecs=vp9,opus';
             outputType = 'video/webm';
           }
           if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'video/webm;codecs=vp8';
+            mimeType = 'video/webm;codecs=vp8,opus';
             outputType = 'video/webm';
           }
           if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -358,9 +385,10 @@
 
           console.log('[Story POC] Using codec:', mimeType);
 
-          recorder = new MediaRecorder(stream, {
+          recorder = new MediaRecorder(combinedStream, {
             mimeType: mimeType,
-            videoBitsPerSecond: 8000000
+            videoBitsPerSecond: 8000000,
+            audioBitsPerSecond: 128000
           });
 
           recorder.ondataavailable = function(e) {
@@ -372,6 +400,10 @@
             console.log('[Story POC] Recording complete, size:', blob.size, 'type:', outputType);
             video.pause();
             video.src = '';
+            // Clean up audio context
+            if (audioContext) {
+              audioContext.close().catch(function() {});
+            }
             resolve({ blob: blob, isMP4: outputType === 'video/mp4' });
           };
 
@@ -908,7 +940,7 @@
           recordStoryWithUI(story).then(function(result) {
             var blob = result.blob;
             var ext = result.isMP4 ? 'mp4' : 'webm';
-            var recordFilename = generateFilename(story, 'ui', ext);
+            var recordFilename = generateFilename(story, 'original', ext);
             console.log('[Story POC] Recording done:', recordFilename, 'size:', blob.size);
             if (blob.size > 1000) {
               downloadBlob(blob, recordFilename);
@@ -921,7 +953,7 @@
         );
       } else {
         // Screenshot (for images or video frame)
-        var uiFilename = generateFilename(story, 'ui', 'png');
+        var uiFilename = generateFilename(story, 'original', 'png');
         console.log('[Story POC] Capturing with UI:', uiFilename);
 
         promises.push(
