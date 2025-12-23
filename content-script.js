@@ -738,30 +738,37 @@
 
     // Format options
     var formatSection = document.createElement('div');
-    formatSection.style.cssText = 'width:100%;max-width:900px;margin-bottom:15px;padding:15px;' +
-      'background:#1a1a1a;border-radius:8px;color:white;';
+    formatSection.style.cssText = 'width:100%;max-width:900px;margin-bottom:15px;padding:20px;' +
+      'background:#ffffff;border-radius:12px;color:#000000;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
 
-    formatSection.innerHTML = '<div style="margin-bottom:10px;font-weight:bold;">Download Format</div>' +
-      '<div style="display:flex;gap:20px;flex-wrap:wrap;">' +
-        '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;">' +
-          '<input type="radio" name="poc-format" value="raw" ' + (window.__downloadFormat === 'raw' ? 'checked' : '') + '> Raw Only' +
+    var labelStyle = 'display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 16px;' +
+      'background:#f0f0f0;border-radius:8px;font-size:14px;font-weight:500;color:#000000;' +
+      'border:2px solid transparent;transition:all 0.2s;';
+    var labelCheckedStyle = 'display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 16px;' +
+      'background:#e3f2fd;border-radius:8px;font-size:14px;font-weight:500;color:#1976d2;' +
+      'border:2px solid #1976d2;transition:all 0.2s;';
+
+    formatSection.innerHTML = '<div style="margin-bottom:12px;font-weight:bold;font-size:16px;color:#000000;">Download Format</div>' +
+      '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
+        '<label style="' + (window.__downloadFormat === 'raw' ? labelCheckedStyle : labelStyle) + '">' +
+          '<input type="radio" name="poc-format" value="raw" ' + (window.__downloadFormat === 'raw' ? 'checked' : '') + ' style="accent-color:#1976d2;width:18px;height:18px;"> Raw Only' +
         '</label>' +
-        '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;">' +
-          '<input type="radio" name="poc-format" value="ui" ' + (window.__downloadFormat === 'ui' ? 'checked' : '') + '> With UI Only' +
+        '<label style="' + (window.__downloadFormat === 'ui' ? labelCheckedStyle : labelStyle) + '">' +
+          '<input type="radio" name="poc-format" value="ui" ' + (window.__downloadFormat === 'ui' ? 'checked' : '') + ' style="accent-color:#1976d2;width:18px;height:18px;"> With UI Only' +
         '</label>' +
-        '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;">' +
-          '<input type="radio" name="poc-format" value="both" ' + (window.__downloadFormat === 'both' ? 'checked' : '') + '> Both Versions' +
+        '<label style="' + (window.__downloadFormat === 'both' ? labelCheckedStyle : labelStyle) + '">' +
+          '<input type="radio" name="poc-format" value="both" ' + (window.__downloadFormat === 'both' ? 'checked' : '') + ' style="accent-color:#1976d2;width:18px;height:18px;"> Both Versions' +
         '</label>' +
       '</div>' +
-      '<div id="poc-video-options" style="margin-top:15px;padding-top:15px;border-top:1px solid #333;' +
+      '<div id="poc-video-options" style="margin-top:16px;padding-top:16px;border-top:2px solid #e0e0e0;' +
         (window.__downloadFormat === 'raw' ? 'display:none;' : '') + '">' +
-        '<div style="margin-bottom:10px;font-weight:bold;">Video UI Format</div>' +
-        '<div style="display:flex;gap:20px;flex-wrap:wrap;">' +
-          '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;">' +
-            '<input type="radio" name="poc-video-format" value="screenshot" ' + (window.__videoUIFormat === 'screenshot' ? 'checked' : '') + '> Screenshot (JPG)' +
+        '<div style="margin-bottom:12px;font-weight:bold;font-size:16px;color:#000000;">Video UI Format</div>' +
+        '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
+          '<label style="' + (window.__videoUIFormat === 'screenshot' ? labelCheckedStyle : labelStyle) + '">' +
+            '<input type="radio" name="poc-video-format" value="screenshot" ' + (window.__videoUIFormat === 'screenshot' ? 'checked' : '') + ' style="accent-color:#1976d2;width:18px;height:18px;"> Screenshot (PNG)' +
           '</label>' +
-          '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;">' +
-            '<input type="radio" name="poc-video-format" value="recording" ' + (window.__videoUIFormat === 'recording' ? 'checked' : '') + '> Screen Recording (WebM)' +
+          '<label style="' + (window.__videoUIFormat === 'recording' ? labelCheckedStyle : labelStyle) + '">' +
+            '<input type="radio" name="poc-video-format" value="recording" ' + (window.__videoUIFormat === 'recording' ? 'checked' : '') + ' style="accent-color:#1976d2;width:18px;height:18px;"> Screen Recording (MP4)' +
           '</label>' +
         '</div>' +
       '</div>';
