@@ -265,108 +265,137 @@
     });
   }
 
-  function recordStoryWithUI(duration) {
+  function recordStoryWithUI(story) {
     return new Promise(function(resolve, reject) {
-      // Find the video element
-      var video = document.querySelector('video');
-      if (!video) {
-        reject(new Error('Video element not found'));
+      if (!story.videoUrl) {
+        reject(new Error('No video URL'));
         return;
       }
 
       var container = findStoryContainer();
+      var uiElements = captureUIElements(container);
+      uiElements.username = uiElements.username || story.username;
+
+      // Create our own video element and load the raw video
+      var video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      video.playsInline = true;
 
       // Create canvas for compositing
       var canvas = document.createElement('canvas');
       var ctx = canvas.getContext('2d');
-
-      // Set canvas size to match video
       canvas.width = 1080;
       canvas.height = 1920;
 
-      // Get UI elements to overlay
-      var uiElements = captureUIElements(container);
-
-      // Set up MediaRecorder
-      var stream = canvas.captureStream(30);
-      var recorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9',
-        videoBitsPerSecond: 8000000
-      });
-
+      var recorder = null;
       var chunks = [];
-      recorder.ondataavailable = function(e) {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
 
-      recorder.onstop = function() {
-        var blob = new Blob(chunks, { type: 'video/webm' });
-        resolve(blob);
-      };
+      video.onloadedmetadata = function() {
+        console.log('[Story POC] Video loaded:', video.videoWidth, 'x', video.videoHeight);
 
-      // Start recording
-      recorder.start(100); // Collect data every 100ms
+        // Set up MediaRecorder
+        var stream = canvas.captureStream(30);
 
-      // Draw frames at 30fps
-      var startTime = Date.now();
-      var maxDuration = (duration || 15) * 1000;
-
-      function drawFrame() {
-        var elapsed = Date.now() - startTime;
-
-        if (elapsed >= maxDuration || video.ended || video.paused) {
-          recorder.stop();
-          return;
+        // Try different codecs
+        var mimeType = 'video/webm;codecs=vp9';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'video/webm;codecs=vp8';
+        }
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'video/webm';
         }
 
-        // Clear canvas
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw video frame centered
-        var videoAspect = video.videoWidth / video.videoHeight;
-        var canvasAspect = canvas.width / canvas.height;
-        var drawWidth, drawHeight, drawX, drawY;
-
-        if (videoAspect > canvasAspect) {
-          drawWidth = canvas.width;
-          drawHeight = canvas.width / videoAspect;
-          drawX = 0;
-          drawY = (canvas.height - drawHeight) / 2;
-        } else {
-          drawHeight = canvas.height;
-          drawWidth = canvas.height * videoAspect;
-          drawX = (canvas.width - drawWidth) / 2;
-          drawY = 0;
-        }
-
-        try {
-          ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
-        } catch (e) {
-          // Video might not be ready
-        }
-
-        // Draw UI overlay
-        drawUIOverlay(ctx, canvas.width, canvas.height, uiElements);
-
-        requestAnimationFrame(drawFrame);
-      }
-
-      // Ensure video is playing
-      if (video.paused) {
-        video.play().then(drawFrame).catch(function() {
-          drawFrame();
+        recorder = new MediaRecorder(stream, {
+          mimeType: mimeType,
+          videoBitsPerSecond: 5000000
         });
-      } else {
-        drawFrame();
-      }
 
-      // Safety timeout
-      setTimeout(function() {
-        if (recorder.state === 'recording') {
-          recorder.stop();
+        recorder.ondataavailable = function(e) {
+          if (e.data.size > 0) chunks.push(e.data);
+        };
+
+        recorder.onstop = function() {
+          var blob = new Blob(chunks, { type: 'video/webm' });
+          console.log('[Story POC] Recording complete, size:', blob.size);
+          video.pause();
+          video.src = '';
+          resolve(blob);
+        };
+
+        // Start recording and playing
+        recorder.start(100);
+        video.play();
+
+        var duration = story.videoDuration || video.duration || 15;
+        var startTime = Date.now();
+        var maxDuration = duration * 1000;
+
+        function drawFrame() {
+          var elapsed = Date.now() - startTime;
+          var progress = Math.min(elapsed / maxDuration, 1);
+
+          if (video.ended || elapsed >= maxDuration) {
+            if (recorder && recorder.state === 'recording') {
+              recorder.stop();
+            }
+            return;
+          }
+
+          // Clear and draw black background
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Draw video frame
+          if (video.readyState >= 2) {
+            var videoAspect = video.videoWidth / video.videoHeight;
+            var canvasAspect = canvas.width / canvas.height;
+            var drawWidth, drawHeight, drawX, drawY;
+
+            if (videoAspect > canvasAspect) {
+              drawWidth = canvas.width;
+              drawHeight = canvas.width / videoAspect;
+              drawX = 0;
+              drawY = (canvas.height - drawHeight) / 2;
+            } else {
+              drawHeight = canvas.height;
+              drawWidth = canvas.height * videoAspect;
+              drawX = (canvas.width - drawWidth) / 2;
+              drawY = 0;
+            }
+
+            try {
+              ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+            } catch (e) {
+              console.error('[Story POC] Draw error:', e);
+            }
+          }
+
+          // Draw UI overlay with progress
+          drawUIOverlay(ctx, canvas.width, canvas.height, uiElements, progress);
+
+          requestAnimationFrame(drawFrame);
         }
-      }, maxDuration + 2000);
+
+        drawFrame();
+
+        // Safety timeout
+        setTimeout(function() {
+          if (recorder && recorder.state === 'recording') {
+            recorder.stop();
+          }
+        }, maxDuration + 3000);
+      };
+
+      video.onerror = function(e) {
+        console.error('[Story POC] Video load error:', e);
+        reject(new Error('Failed to load video'));
+      };
+
+      // Load the video
+      console.log('[Story POC] Loading video for recording...');
+      video.src = story.videoUrl;
+      video.load();
     });
   }
 
@@ -402,7 +431,9 @@
     return ui;
   }
 
-  function drawUIOverlay(ctx, width, height, ui) {
+  function drawUIOverlay(ctx, width, height, ui, progress) {
+    if (progress === undefined) progress = 0.5;
+
     // Semi-transparent gradient at top
     var gradient = ctx.createLinearGradient(0, 0, 0, 200);
     gradient.addColorStop(0, 'rgba(0,0,0,0.6)');
@@ -410,24 +441,30 @@
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, 200);
 
-    // Progress bar at top
+    // Progress bar at top (animated)
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.fillRect(20, 20, width - 40, 4);
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillRect(20, 20, (width - 40) * 0.5, 4);
+    ctx.fillRect(20, 20, (width - 40) * progress, 4);
+
+    // Profile circle placeholder
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.arc(52, 80, 24, 0, Math.PI * 2);
+    ctx.fill();
 
     // Username text
     if (ui.username) {
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 32px -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.fillText(ui.username, 80, 80);
+      ctx.font = 'bold 28px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillText(ui.username, 90, 75);
     }
 
     // Timestamp
     if (ui.timestamp) {
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.font = '24px -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.fillText(ui.timestamp, 80, 115);
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = '22px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillText(ui.timestamp, 90, 105);
     }
 
     // Bottom gradient
@@ -438,14 +475,27 @@
     ctx.fillRect(0, height - 150, width, 150);
 
     // Reply bar placeholder
-    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.beginPath();
-    ctx.roundRect(40, height - 80, width - 200, 50, 25);
+    ctx.roundRect(30, height - 70, width - 180, 44, 22);
     ctx.fill();
 
+    // Reply bar border
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(30, height - 70, width - 180, 44, 22);
+    ctx.stroke();
+
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '24px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('Send message', 55, height - 40);
+
+    // Heart and send icons on right
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.font = '28px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.fillText('Reply...', 70, height - 47);
+    ctx.fillText('♡', width - 120, height - 40);
+    ctx.fillText('➤', width - 60, height - 40);
   }
 
   // ============================================================
@@ -697,16 +747,17 @@
     // Download UI version
     if (format === 'ui' || format === 'both') {
       if (story.mediaType === 2 && videoUIFormat === 'recording') {
-        // Video recording
+        // Video recording - load raw video and composite UI on top
         var recordFilename = generateFilename(story, 'ui', 'webm');
         console.log('[Story POC] Recording with UI:', recordFilename);
 
         promises.push(
-          loadHtml2Canvas().then(function() {
-            var duration = story.videoDuration || 15;
-            return recordStoryWithUI(duration);
-          }).then(function(blob) {
-            downloadBlob(blob, recordFilename);
+          recordStoryWithUI(story).then(function(blob) {
+            if (blob.size > 1000) {
+              downloadBlob(blob, recordFilename);
+            } else {
+              console.error('[Story POC] Recording too small, skipping');
+            }
           }).catch(function(err) {
             console.error('[Story POC] Recording failed:', err);
           })
