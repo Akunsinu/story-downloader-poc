@@ -531,175 +531,174 @@
 
     // Scale factor for UI elements (1080x1920 canvas)
     var scale = width / 1080;
+    var avatarSize = 80 * scale;
+    var avatarX = 40 * scale;
+    var avatarY = 70 * scale;
+    var textX = avatarX + avatarSize + 24 * scale;
+    var headerY = 50 * scale;
 
-    // Bottom bar height (solid black area below story)
-    var bottomBarHeight = 120 * scale;
-    var storyHeight = height - bottomBarHeight;
-
-    // === TOP GRADIENT (over story content) ===
-    var gradient = ctx.createLinearGradient(0, 0, 0, 200 * scale);
-    gradient.addColorStop(0, 'rgba(0,0,0,0.5)');
+    // Semi-transparent gradient at top (larger)
+    var gradient = ctx.createLinearGradient(0, 0, 0, 350 * scale);
+    gradient.addColorStop(0, 'rgba(0,0,0,0.7)');
     gradient.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, 200 * scale);
+    ctx.fillRect(0, 0, width, 350 * scale);
 
-    // === PROGRESS BAR ===
-    var barY = 20 * scale;
-    var barHeight = 3 * scale;
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    // Progress bar at top (thicker)
+    var barY = 24 * scale;
+    var barHeight = 6 * scale;
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.beginPath();
-    ctx.roundRect(16 * scale, barY, width - 32 * scale, barHeight, barHeight / 2);
+    ctx.roundRect(24 * scale, barY, width - 48 * scale, barHeight, barHeight / 2);
     ctx.fill();
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
     ctx.beginPath();
-    ctx.roundRect(16 * scale, barY, (width - 32 * scale) * progress, barHeight, barHeight / 2);
+    ctx.roundRect(24 * scale, barY, (width - 48 * scale) * progress, barHeight, barHeight / 2);
     ctx.fill();
 
-    // === PROFILE PICTURE ===
-    var avatarSize = 64 * scale;
-    var avatarX = 24 * scale;
-    var avatarY = 44 * scale;
+    // Profile picture (circular)
     var avatarCenterX = avatarX + avatarSize / 2;
     var avatarCenterY = avatarY + avatarSize / 2;
 
-    // Gradient ring around avatar
+    // Draw gradient ring around avatar (Instagram story style)
     var ringGradient = ctx.createLinearGradient(
-      avatarCenterX - avatarSize, avatarCenterY - avatarSize,
-      avatarCenterX + avatarSize, avatarCenterY + avatarSize
+      avatarCenterX - avatarSize / 2, avatarCenterY - avatarSize / 2,
+      avatarCenterX + avatarSize / 2, avatarCenterY + avatarSize / 2
     );
-    ringGradient.addColorStop(0, '#feda75');
-    ringGradient.addColorStop(0.25, '#fa7e1e');
-    ringGradient.addColorStop(0.5, '#d62976');
-    ringGradient.addColorStop(0.75, '#962fbf');
-    ringGradient.addColorStop(1, '#4f5bd5');
+    ringGradient.addColorStop(0, '#F58529');
+    ringGradient.addColorStop(0.5, '#DD2A7B');
+    ringGradient.addColorStop(1, '#8134AF');
     ctx.strokeStyle = ringGradient;
-    ctx.lineWidth = 3 * scale;
+    ctx.lineWidth = 4 * scale;
     ctx.beginPath();
-    ctx.arc(avatarCenterX, avatarCenterY, avatarSize / 2 + 3 * scale, 0, Math.PI * 2);
+    ctx.arc(avatarCenterX, avatarCenterY, avatarSize / 2 + 4 * scale, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Profile picture
+    // Draw profile picture or placeholder
     ctx.save();
     ctx.beginPath();
-    ctx.arc(avatarCenterX, avatarCenterY, avatarSize / 2 - 2 * scale, 0, Math.PI * 2);
+    ctx.arc(avatarCenterX, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
     ctx.clip();
+
     if (ui.profilePicImage) {
-      ctx.drawImage(ui.profilePicImage, avatarX + 2 * scale, avatarY + 2 * scale, avatarSize - 4 * scale, avatarSize - 4 * scale);
+      // Draw the actual profile picture
+      ctx.drawImage(ui.profilePicImage, avatarX, avatarY, avatarSize, avatarSize);
     } else {
-      ctx.fillStyle = '#262626';
+      // Placeholder circle
+      ctx.fillStyle = '#333333';
       ctx.fillRect(avatarX, avatarY, avatarSize, avatarSize);
+      // Person icon placeholder
+      ctx.fillStyle = '#666666';
+      ctx.beginPath();
+      ctx.arc(avatarCenterX, avatarCenterY - 8 * scale, 16 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(avatarCenterX, avatarCenterY + 40 * scale, 28 * scale, Math.PI, 0);
+      ctx.fill();
     }
     ctx.restore();
 
-    // === USERNAME AND TIMESTAMP ===
-    var textX = avatarX + avatarSize + 16 * scale;
-
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 4 * scale;
+    // Enable text shadow for all text elements
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 8 * scale;
     ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 1 * scale;
+    ctx.shadowOffsetY = 2 * scale;
 
-    // Username
+    // Username text (larger, bold, white)
+    if (ui.username) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold ' + Math.round(42 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(ui.username, textX, avatarY + 35 * scale);
+    }
+
+    // Timestamp (larger, bright white)
+    if (ui.timestamp) {
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = Math.round(32 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(ui.timestamp, textX, avatarY + 75 * scale);
+    }
+
+    // Close button (X) on top right
     ctx.fillStyle = '#ffffff';
-    ctx.font = '600 ' + Math.round(28 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    var usernameWidth = ctx.measureText(ui.username || '').width;
-    ctx.fillText(ui.username || '', textX, avatarCenterY + 4 * scale);
+    ctx.font = Math.round(48 * scale) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('×', width - 60 * scale, 80 * scale);
 
-    // Timestamp (next to username)
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.font = '400 ' + Math.round(28 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText(ui.timestamp || '', textX + usernameWidth + 12 * scale, avatarCenterY + 4 * scale);
+    // More button (...)
+    ctx.font = 'bold ' + Math.round(40 * scale) + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('···', width - 120 * scale, 76 * scale);
 
-    // === TOP RIGHT ICONS ===
-    ctx.fillStyle = '#ffffff';
-
-    // More options (three dots)
-    var dotsX = width - 80 * scale;
-    var dotsY = avatarCenterY;
-    ctx.beginPath();
-    ctx.arc(dotsX - 24 * scale, dotsY, 4 * scale, 0, Math.PI * 2);
-    ctx.arc(dotsX, dotsY, 4 * scale, 0, Math.PI * 2);
-    ctx.arc(dotsX + 24 * scale, dotsY, 4 * scale, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Close X button
-    var closeX = width - 36 * scale;
-    var closeY = avatarCenterY;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3 * scale;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(closeX - 12 * scale, closeY - 12 * scale);
-    ctx.lineTo(closeX + 12 * scale, closeY + 12 * scale);
-    ctx.moveTo(closeX + 12 * scale, closeY - 12 * scale);
-    ctx.lineTo(closeX - 12 * scale, closeY + 12 * scale);
-    ctx.stroke();
-
-    // Reset shadow
+    // Disable shadow for shapes
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
 
-    // === BOTTOM BLACK BAR ===
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, storyHeight, width, bottomBarHeight);
+    // Bottom gradient (larger)
+    var bottomGradient = ctx.createLinearGradient(0, height - 250 * scale, 0, height);
+    bottomGradient.addColorStop(0, 'rgba(0,0,0,0)');
+    bottomGradient.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = bottomGradient;
+    ctx.fillRect(0, height - 250 * scale, width, 250 * scale);
 
-    // === SEND MESSAGE INPUT ===
-    var inputY = storyHeight + (bottomBarHeight - 48 * scale) / 2;
-    var inputHeight = 48 * scale;
-    var inputWidth = width - 240 * scale;
-    var inputX = 24 * scale;
+    // Reply bar (larger)
+    var replyBarY = height - 100 * scale;
+    var replyBarHeight = 60 * scale;
+    var replyBarWidth = width - 260 * scale;
 
-    // Input background (dark grey, rounded)
-    ctx.fillStyle = '#262626';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.beginPath();
-    ctx.roundRect(inputX, inputY, inputWidth, inputHeight, inputHeight / 2);
+    ctx.roundRect(30 * scale, replyBarY, replyBarWidth, replyBarHeight, replyBarHeight / 2);
     ctx.fill();
 
-    // Input border
-    ctx.strokeStyle = '#363636';
-    ctx.lineWidth = 1 * scale;
+    // Reply bar border
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 2 * scale;
     ctx.beginPath();
-    ctx.roundRect(inputX, inputY, inputWidth, inputHeight, inputHeight / 2);
+    ctx.roundRect(30 * scale, replyBarY, replyBarWidth, replyBarHeight, replyBarHeight / 2);
     ctx.stroke();
 
-    // "Send message..." text
-    ctx.fillStyle = '#a8a8a8';
-    ctx.font = '400 ' + Math.round(28 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText('Send message...', inputX + 24 * scale, inputY + inputHeight / 2 + 8 * scale);
+    // Reply bar text (with shadow for readability)
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 4 * scale;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = Math.round(32 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('Send message...', 60 * scale, replyBarY + 40 * scale);
 
-    // === BOTTOM ICONS ===
-    var iconY = storyHeight + bottomBarHeight / 2;
-    var iconSize = 48 * scale;
-    ctx.strokeStyle = '#ffffff';
+    // Reset shadow for icons
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+
+    // Icons on right side
+    var iconY = replyBarY + replyBarHeight / 2;
     ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2.5 * scale;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Heart icon (outline)
-    var heartX = width - 180 * scale;
-    drawHeartIcon(ctx, heartX, iconY, iconSize * 0.55);
+    // Heart icon (outline) - ♡
+    var heartX = width - 200 * scale;
+    drawHeartIcon(ctx, heartX, iconY, 28 * scale);
 
     // Comment/speech bubble icon
-    var commentX = width - 115 * scale;
-    drawCommentIcon(ctx, commentX, iconY, iconSize * 0.55);
+    var commentX = width - 130 * scale;
+    drawCommentIcon(ctx, commentX, iconY, 28 * scale);
 
     // Paper plane / Send icon
-    var sendX = width - 50 * scale;
-    drawSendIcon(ctx, sendX, iconY, iconSize * 0.55);
+    var sendX = width - 55 * scale;
+    drawSendIcon(ctx, sendX, iconY, 28 * scale);
   }
 
   // Draw heart outline icon
   function drawHeartIcon(ctx, x, y, size) {
     ctx.save();
     ctx.translate(x, y);
-    ctx.scale(size / 24, size / 24);
+    var s = size / 28;
+    ctx.scale(s, s);
     ctx.beginPath();
-    ctx.moveTo(0, -6);
-    ctx.bezierCurveTo(-8, -14, -18, -4, -12, 6);
-    ctx.lineTo(0, 14);
-    ctx.lineTo(12, 6);
-    ctx.bezierCurveTo(18, -4, 8, -14, 0, -6);
+    ctx.moveTo(0, -8);
+    ctx.bezierCurveTo(-10, -18, -22, -6, -14, 8);
+    ctx.lineTo(0, 20);
+    ctx.lineTo(14, 8);
+    ctx.bezierCurveTo(22, -6, 10, -18, 0, -8);
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
@@ -709,18 +708,22 @@
   function drawCommentIcon(ctx, x, y, size) {
     ctx.save();
     ctx.translate(x, y);
-    ctx.scale(size / 24, size / 24);
+    var s = size / 28;
+    ctx.scale(s, s);
     ctx.beginPath();
-    // Main bubble (flipped horizontally for Instagram style)
-    ctx.moveTo(12, -12);
-    ctx.bezierCurveTo(18, -12, 22, -7, 22, -1);
-    ctx.bezierCurveTo(22, 5, 18, 10, 12, 10);
-    ctx.lineTo(4, 10);
-    ctx.lineTo(-6, 18);
-    ctx.lineTo(-4, 10);
-    ctx.lineTo(-10, 10);
-    ctx.bezierCurveTo(-16, 10, -20, 5, -20, -1);
-    ctx.bezierCurveTo(-20, -7, -16, -12, -10, -12);
+    // Rounded rectangle bubble
+    ctx.moveTo(-12, -14);
+    ctx.lineTo(12, -14);
+    ctx.quadraticCurveTo(18, -14, 18, -8);
+    ctx.lineTo(18, 4);
+    ctx.quadraticCurveTo(18, 10, 12, 10);
+    ctx.lineTo(-2, 10);
+    ctx.lineTo(-10, 20);
+    ctx.lineTo(-8, 10);
+    ctx.lineTo(-12, 10);
+    ctx.quadraticCurveTo(-18, 10, -18, 4);
+    ctx.lineTo(-18, -8);
+    ctx.quadraticCurveTo(-18, -14, -12, -14);
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
@@ -730,19 +733,20 @@
   function drawSendIcon(ctx, x, y, size) {
     ctx.save();
     ctx.translate(x, y);
-    ctx.scale(size / 24, size / 24);
+    var s = size / 28;
+    ctx.scale(s, s);
     ctx.beginPath();
-    // Paper plane shape (Instagram style - tilted)
-    ctx.moveTo(-12, 12);
-    ctx.lineTo(14, -2);
-    ctx.lineTo(-12, -14);
-    ctx.lineTo(-6, -2);
+    // Paper plane pointing right (Instagram DM style)
+    ctx.moveTo(-14, 16);
+    ctx.lineTo(18, 0);
+    ctx.lineTo(-14, -16);
+    ctx.lineTo(-8, 0);
     ctx.closePath();
     ctx.stroke();
     // Inner line
     ctx.beginPath();
-    ctx.moveTo(-6, -2);
-    ctx.lineTo(14, -2);
+    ctx.moveTo(-8, 0);
+    ctx.lineTo(18, 0);
     ctx.stroke();
     ctx.restore();
   }
