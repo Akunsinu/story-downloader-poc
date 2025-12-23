@@ -279,13 +279,19 @@
       canvas.height = 1920;
 
       if (story.videoUrl) {
-        // For video: load video and capture first frame
+        // For video: load video and capture frame at 0.5 seconds
         var video = document.createElement('video');
         video.crossOrigin = 'anonymous';
         video.muted = true;
         video.playsInline = true;
+        video.preload = 'auto';
 
-        video.onloadeddata = function() {
+        var hasDrawn = false;
+
+        function drawVideoFrame() {
+          if (hasDrawn) return;
+          hasDrawn = true;
+
           profilePicLoaded.then(function() {
             uiElements.profilePicImage = profilePicImage;
 
@@ -312,8 +318,8 @@
 
             ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
 
-            // Draw UI overlay
-            drawUIOverlay(ctx, canvas.width, canvas.height, uiElements, 0);
+            // Draw UI overlay (progress at ~10%)
+            drawUIOverlay(ctx, canvas.width, canvas.height, uiElements, 0.1);
 
             // Convert to blob
             canvas.toBlob(function(blob) {
@@ -321,6 +327,17 @@
               resolve(blob);
             }, 'image/png', 1.0);
           });
+        }
+
+        video.onloadedmetadata = function() {
+          // Seek to 0.5 seconds or 10% into the video, whichever is smaller
+          var seekTime = Math.min(0.5, video.duration * 0.1);
+          video.currentTime = seekTime;
+        };
+
+        video.onseeked = function() {
+          // Wait a bit for the frame to render, then draw
+          setTimeout(drawVideoFrame, 100);
         };
 
         video.onerror = function() {
@@ -737,122 +754,124 @@
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
 
-    // Bottom gradient (larger)
-    var bottomGradient = ctx.createLinearGradient(0, height - 250 * scale, 0, height);
-    bottomGradient.addColorStop(0, 'rgba(0,0,0,0)');
-    bottomGradient.addColorStop(1, 'rgba(0,0,0,0.7)');
-    ctx.fillStyle = bottomGradient;
-    ctx.fillRect(0, height - 250 * scale, width, 250 * scale);
+    // === BOTTOM BLACK BAR (Instagram style) ===
+    var bottomBarHeight = 110 * scale;
+    var storyBottomY = height - bottomBarHeight;
 
-    // Reply bar (larger)
-    var replyBarY = height - 100 * scale;
-    var replyBarHeight = 60 * scale;
-    var replyBarWidth = width - 260 * scale;
+    // Solid black bar at bottom
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, storyBottomY, width, bottomBarHeight);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    // === SEND MESSAGE INPUT ===
+    var inputHeight = 44 * scale;
+    var inputY = storyBottomY + (bottomBarHeight - inputHeight) / 2;
+    var inputX = 28 * scale;
+    var inputWidth = width - 220 * scale;
+
+    // Dark grey pill-shaped input
+    ctx.fillStyle = '#262626';
     ctx.beginPath();
-    ctx.roundRect(30 * scale, replyBarY, replyBarWidth, replyBarHeight, replyBarHeight / 2);
+    ctx.roundRect(inputX, inputY, inputWidth, inputHeight, inputHeight / 2);
     ctx.fill();
 
-    // Reply bar border
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 2 * scale;
+    // Subtle border
+    ctx.strokeStyle = '#363636';
+    ctx.lineWidth = 1 * scale;
     ctx.beginPath();
-    ctx.roundRect(30 * scale, replyBarY, replyBarWidth, replyBarHeight, replyBarHeight / 2);
+    ctx.roundRect(inputX, inputY, inputWidth, inputHeight, inputHeight / 2);
     ctx.stroke();
 
-    // Reply bar text (with shadow for readability)
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-    ctx.shadowBlur = 4 * scale;
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = Math.round(32 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText('Send message...', 60 * scale, replyBarY + 40 * scale);
+    // "Send message..." text
+    ctx.fillStyle = '#a0a0a0';
+    ctx.font = '400 ' + Math.round(26 * scale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('Send message...', inputX + 20 * scale, inputY + inputHeight / 2 + 8 * scale);
 
-    // Reset shadow for icons
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
+    // === BOTTOM ICONS ===
+    var iconY = storyBottomY + bottomBarHeight / 2;
+    var iconSpacing = 56 * scale;
+    var firstIconX = width - 170 * scale;
 
-    // Icons on right side
-    var iconY = replyBarY + replyBarHeight / 2;
-    ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2.5 * scale;
+    ctx.fillStyle = '#ffffff';
+    ctx.lineWidth = 2 * scale;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Heart icon (outline) - ♡
-    var heartX = width - 200 * scale;
-    drawHeartIcon(ctx, heartX, iconY, 28 * scale);
+    // Heart icon
+    drawHeartIcon(ctx, firstIconX, iconY, 26 * scale);
 
-    // Comment/speech bubble icon
-    var commentX = width - 130 * scale;
-    drawCommentIcon(ctx, commentX, iconY, 28 * scale);
+    // Comment bubble icon
+    drawCommentIcon(ctx, firstIconX + iconSpacing, iconY, 26 * scale);
 
     // Paper plane / Send icon
-    var sendX = width - 55 * scale;
-    drawSendIcon(ctx, sendX, iconY, 28 * scale);
+    drawSendIcon(ctx, firstIconX + iconSpacing * 2, iconY, 26 * scale);
   }
 
-  // Draw heart outline icon
+  // Draw heart outline icon (Instagram style)
   function drawHeartIcon(ctx, x, y, size) {
     ctx.save();
     ctx.translate(x, y);
-    var s = size / 28;
+    var s = size / 24;
     ctx.scale(s, s);
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(0, -8);
-    ctx.bezierCurveTo(-10, -18, -22, -6, -14, 8);
-    ctx.lineTo(0, 20);
-    ctx.lineTo(14, 8);
-    ctx.bezierCurveTo(22, -6, 10, -18, 0, -8);
+    // Heart shape
+    ctx.moveTo(0, 6);
+    ctx.bezierCurveTo(-1, 5, -3, 2, -6, 2);
+    ctx.bezierCurveTo(-10, 2, -12, 6, -12, 9);
+    ctx.bezierCurveTo(-12, 14, -6, 18, 0, 22);
+    ctx.bezierCurveTo(6, 18, 12, 14, 12, 9);
+    ctx.bezierCurveTo(12, 6, 10, 2, 6, 2);
+    ctx.bezierCurveTo(3, 2, 1, 5, 0, 6);
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
   }
 
-  // Draw comment/speech bubble icon
+  // Draw comment/speech bubble icon (Instagram style)
   function drawCommentIcon(ctx, x, y, size) {
     ctx.save();
     ctx.translate(x, y);
-    var s = size / 28;
+    var s = size / 24;
     ctx.scale(s, s);
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    // Rounded rectangle bubble
-    ctx.moveTo(-12, -14);
-    ctx.lineTo(12, -14);
-    ctx.quadraticCurveTo(18, -14, 18, -8);
-    ctx.lineTo(18, 4);
-    ctx.quadraticCurveTo(18, 10, 12, 10);
-    ctx.lineTo(-2, 10);
-    ctx.lineTo(-10, 20);
-    ctx.lineTo(-8, 10);
-    ctx.lineTo(-12, 10);
-    ctx.quadraticCurveTo(-18, 10, -18, 4);
-    ctx.lineTo(-18, -8);
-    ctx.quadraticCurveTo(-18, -14, -12, -14);
+    // Rounded bubble with tail at bottom-left
+    ctx.moveTo(-9, -10);
+    ctx.quadraticCurveTo(-12, -10, -12, -6);
+    ctx.lineTo(-12, 4);
+    ctx.quadraticCurveTo(-12, 8, -8, 8);
+    ctx.lineTo(-6, 8);
+    ctx.lineTo(-10, 14);
+    ctx.lineTo(-2, 8);
+    ctx.lineTo(9, 8);
+    ctx.quadraticCurveTo(12, 8, 12, 4);
+    ctx.lineTo(12, -6);
+    ctx.quadraticCurveTo(12, -10, 9, -10);
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
   }
 
-  // Draw paper plane / send icon
+  // Draw paper plane / send icon (Instagram DM style)
   function drawSendIcon(ctx, x, y, size) {
     ctx.save();
     ctx.translate(x, y);
-    var s = size / 28;
+    var s = size / 24;
     ctx.scale(s, s);
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    // Paper plane pointing right (Instagram DM style)
-    ctx.moveTo(-14, 16);
-    ctx.lineTo(18, 0);
-    ctx.lineTo(-14, -16);
-    ctx.lineTo(-8, 0);
+    // Paper plane outline
+    ctx.moveTo(-10, 10);
+    ctx.lineTo(12, 0);
+    ctx.lineTo(-10, -10);
+    ctx.lineTo(-4, 0);
     ctx.closePath();
     ctx.stroke();
-    // Inner line
+    // Diagonal line inside
     ctx.beginPath();
-    ctx.moveTo(-8, 0);
-    ctx.lineTo(18, 0);
+    ctx.moveTo(-4, 0);
+    ctx.lineTo(12, 0);
     ctx.stroke();
     ctx.restore();
   }
@@ -957,6 +976,16 @@
       'background:#f0f0f0;border-radius:8px;font-size:14px;font-weight:500;color:#000000;' +
       'border:2px solid transparent;transition:all 0.2s;';
 
+    // Check if there are any videos
+    var hasVideos = stories.some(function(s) { return s.mediaType === 2; });
+
+    var screenshotOption = hasVideos ?
+      '<label style="' + labelStyle + '" id="lbl-screenshot">' +
+        '<input type="checkbox" name="poc-format" value="screenshot" style="accent-color:#1976d2;width:18px;height:18px;"> Screenshot (with UI)' +
+      '</label>' : '';
+
+    var screenshotDesc = hasVideos ? ' &nbsp;|&nbsp; <b>Screenshot:</b> Single frame with UI (videos only)' : '';
+
     formatSection.innerHTML = '<div style="margin-bottom:12px;font-weight:bold;font-size:16px;color:#000000;">Download Formats (select one or more)</div>' +
       '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
         '<label style="' + labelStyle + '" id="lbl-raw">' +
@@ -965,14 +994,12 @@
         '<label style="' + labelStyle + '" id="lbl-original">' +
           '<input type="checkbox" name="poc-format" value="original" checked style="accent-color:#1976d2;width:18px;height:18px;"> Original (with UI)' +
         '</label>' +
-        '<label style="' + labelStyle + '" id="lbl-screenshot">' +
-          '<input type="checkbox" name="poc-format" value="screenshot" style="accent-color:#1976d2;width:18px;height:18px;"> Screenshot (with UI)' +
-        '</label>' +
+        screenshotOption +
       '</div>' +
       '<div style="margin-top:12px;font-size:13px;color:#666;">' +
         '<b>Raw:</b> Original media file &nbsp;|&nbsp; ' +
-        '<b>Original:</b> Video recording / Image with UI overlay &nbsp;|&nbsp; ' +
-        '<b>Screenshot:</b> Single frame with UI (PNG)' +
+        '<b>Original:</b> Video recording / Image with UI overlay' +
+        screenshotDesc +
       '</div>';
 
     // Grid
@@ -1145,8 +1172,8 @@
       }
     }
 
-    // Download SCREENSHOT version (single frame with UI - for both video and image)
-    if (formats.indexOf('screenshot') !== -1) {
+    // Download SCREENSHOT version (single frame with UI - videos only)
+    if (formats.indexOf('screenshot') !== -1 && isVideo) {
       var screenshotFilename = generateFilename(story, 'screenshot', 'png');
       console.log('[Story POC] Capturing screenshot with UI:', screenshotFilename);
 
